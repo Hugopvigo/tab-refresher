@@ -1,3 +1,9 @@
+/* ════════════════════════════════════════════════════════════════
+   Tab Refresher v2.3.0 — popup
+   Desarrollado por: Hugo Perez-Vigo / hugopvigo
+   https://github.com/hugopvigo
+   ════════════════════════════════════════════════════════════════ */
+
 const tabsList = document.getElementById('tabsList');
 const searchInput = document.getElementById('search');
 const heroDot = document.getElementById('heroDot');
@@ -5,12 +11,18 @@ const heroText = document.getElementById('heroText');
 const btnClear = document.getElementById('btnClear');
 const currentSection = document.getElementById('currentSection');
 const otherCount = document.getElementById('otherCount');
+const pauseSel = document.getElementById('pauseSel');
+const btnResume = document.getElementById('btnResume');
+const statsLine = document.getElementById('statsLine');
 
 let allTabs = [];
 let currentTab = null;
 let filterText = '';
 let configs = {}; // tabId -> {url,title,interval,active,lastRefresh}
 let focusedTabId = null; // tabId de la pestaña con foco en la ventana activa
+let pinnedDomains = []; // dominios base fijados arriba (configurable por el usuario)
+let pausedUntil = 0; // timestamp ms; 0 = sin pausa global
+let statsTotal = 0; // recargas totales acumuladas
 
 const PRESETS = [
   { val: 30,  label: '30s' },
@@ -32,6 +44,24 @@ function hostname(url) {
   try { return new URL(url).hostname; } catch { return ''; }
 }
 
+/* Los pins se guardan por dominio base (sin www) para que cubran
+   www.suop.es, suop.es y cualquier subdominio. */
+function baseDomain(host) {
+  return host.replace(/^www\./, '');
+}
+
+function isPinned(host) {
+  return pinnedDomains.includes(baseDomain(host));
+}
+
+async function togglePin(domain) {
+  const base = baseDomain(domain);
+  pinnedDomains = pinnedDomains.includes(base)
+    ? pinnedDomains.filter(d => d !== base)
+    : [...pinnedDomains, base];
+  await chrome.storage.local.set({ pinnedDomains });
+}
+
 function matchFilter(tab) {
   if (!filterText) return true;
   const q = filterText.toLowerCase();
@@ -46,6 +76,12 @@ function isUsable(t) {
 
 /* ── Hero ── */
 function setHero() {
+  if (Date.now() < pausedUntil) {
+    heroDot.className = 'hero-dot';
+    heroText.className = 'hero-text on';
+    heroText.textContent = `Pausa global · quedan ${Math.max(1, Math.ceil((pausedUntil - Date.now()) / 60000))} min`;
+    return;
+  }
   const active = Object.values(configs).filter(c => c.active).length;
   if (active > 0) {
     heroDot.classList.add('on');
@@ -56,6 +92,30 @@ function setHero() {
     heroText.className = 'hero-text';
     heroText.textContent = 'Inactivo';
   }
+}
+
+/* ── Pausa global ── */
+function renderPause() {
+  const paused = Date.now() < pausedUntil;
+  pauseSel.classList.toggle('hidden', paused);
+  btnResume.classList.toggle('hidden', !paused);
+  if (paused) {
+    const mins = Math.max(1, Math.ceil((pausedUntil - Date.now()) / 60000));
+    btnResume.textContent = `▶ Reanudar (${mins}m)`;
+  }
+}
+
+async function startPause(mins) {
+  const until = Date.now() + mins * 60000;
+  await chrome.runtime.sendMessage({ action: 'set-pause', until });
+  pausedUntil = until;
+  renderAll();
+}
+
+async function endPause() {
+  await chrome.runtime.sendMessage({ action: 'set-pause', until: 0 });
+  pausedUntil = 0;
+  renderAll();
 }
 
 /* ── Select de intervalos ── */
@@ -193,28 +253,49 @@ function renderTabs() {
     if (!groups[h]) groups[h] = [];
     groups[h].push(tab);
   }
-  const sorted = Object.entries(groups).sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
+
+  /* Orden de grupos: fijados > dominios con más pestañas activas > tamaño > nombre */
+  const activeCount = g => g.filter(t => configs[t.id]?.active).length;
+  const sorted = Object.entries(groups).sort((a, b) => {
+    const pa = isPinned(a[0]) ? 0 : 1;
+    const pb = isPinned(b[0]) ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    if (activeCount(a[1]) !== activeCount(b[1])) return activeCount(b[1]) - activeCount(a[1]);
+    return b[1].length - a[1].length || a[0].localeCompare(b[0]);
+  });
 
   tabsList.innerHTML = '';
   for (const [domain, domainTabs] of sorted) {
+    /* Dentro del grupo, las pestañas activas primero */
+    domainTabs.sort((a, b) =>
+      ((configs[b.id]?.active) ? 1 : 0) - ((configs[a.id]?.active) ? 1 : 0));
+
     const group = document.createElement('div');
     group.className = 'domain-group';
 
     const state = getDomainSwitchState(domainTabs);
+    const pinned = isPinned(domain);
     const header = document.createElement('div');
     header.className = 'domain-header';
     header.innerHTML = `
       <span class="domain-chevron">▼</span>
       <span class="domain-name">${escapeHtml(domain)}</span>
       <span class="domain-count">${domainTabs.length}</span>
+      <span class="domain-pin ${pinned ? 'pinned' : ''}" title="${pinned ? 'Quitar de arriba' : 'Fijar dominio arriba'}">📌</span>
       <label class="switch domain-switch ${state === 'mixed' ? 'mixed' : ''}" title="Activar/desactivar todo el grupo">
         <input type="checkbox" ${state === 'allOn' ? 'checked' : ''}>
         <span class="slider"></span>
       </label>
     `;
     header.addEventListener('click', (e) => {
-      if (e.target.closest('.domain-switch')) return;
+      if (e.target.closest('.domain-switch') || e.target.closest('.domain-pin')) return;
       group.classList.toggle('collapsed');
+    });
+
+    const pinEl = header.querySelector('.domain-pin');
+    pinEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePin(domain);
     });
 
     const switchEl = header.querySelector('.domain-switch input');
@@ -237,7 +318,7 @@ function buildTabRow(tab) {
   const fav = tab.favIconUrl || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="%23555"/></svg>';
 
   const row = document.createElement('div');
-  row.className = 'tab-item';
+  row.className = 'tab-item' + (active ? ' active-row' : '');
   row.innerHTML = `
     <label class="switch">
       <input type="checkbox" ${active ? 'checked' : ''}>
@@ -280,27 +361,38 @@ async function applyInterval(tabId, interval, activate) {
 }
 
 /* ── State ── */
+function renderFooterStats() {
+  statsLine.textContent = `⟳ ${statsTotal.toLocaleString('es-ES')} recarga${statsTotal !== 1 ? 's' : ''} en total`;
+}
+
 function renderAll() {
   renderCurrent();
   renderTabs();
+  renderPause();
   setHero();
+  renderFooterStats();
 }
 
 async function reloadState() {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ action: 'get' }, (resp) => {
       configs = (resp && resp.configs) || {};
+      pausedUntil = (resp && resp.pausedUntil) || 0;
+      statsTotal = (resp && resp.stats && resp.stats.total) || 0;
       renderAll();
       resolve();
     });
   });
 }
 
-/* Refresco reactivo: si el background cambia el estado (p.ej. un reload que
-   acaba de ocurrir) mientras el popup está abierto, se refleja sin reabrirlo. */
+/* Refresco reactivo: cualquier cambio del background (configs, stats, pausa)
+   se refleja sin reabrir el popup. */
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'local' || !changes.configs) return;
-  configs = changes.configs.newValue || {};
+  if (area !== 'local') return;
+  if (changes.configs) configs = changes.configs.newValue || {};
+  if (changes.pinnedDomains) pinnedDomains = changes.pinnedDomains.newValue || [];
+  if (changes.pausedUntil) pausedUntil = changes.pausedUntil.newValue || 0;
+  if (changes.stats) statsTotal = changes.stats.newValue?.total || 0;
   renderAll();
 });
 
@@ -310,6 +402,8 @@ async function loadTabs() {
   currentTab = isUsable(active) ? active : null;
   focusedTabId = currentTab?.id || null;
   allTabs = tabs.filter(isUsable);
+  const pins = await chrome.storage.local.get('pinnedDomains');
+  pinnedDomains = pins.pinnedDomains || [];
   await reloadState();
 }
 
@@ -344,7 +438,23 @@ searchInput.addEventListener('input', () => {
   renderTabs();
 });
 
-/* Actualizar "recargada hace Xs" en tiempo real */
-setInterval(updateCurrentFreshness, 1000);
+/* ── Pausa global ── */
+pauseSel.addEventListener('change', () => {
+  const mins = parseInt(pauseSel.value, 10);
+  if (mins) startPause(mins);
+  pauseSel.value = '';
+});
+btnResume.addEventListener('click', endPause);
+
+/* Ticker 1s: frescura de la pestaña actual + cuenta atrás de la pausa */
+setInterval(() => {
+  updateCurrentFreshness();
+  if (Date.now() < pausedUntil) {
+    renderPause();
+    setHero();
+  } else if (!btnResume.classList.contains('hidden')) {
+    renderAll();
+  }
+}, 1000);
 
 loadTabs();

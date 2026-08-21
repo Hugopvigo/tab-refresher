@@ -1,3 +1,9 @@
+/* ════════════════════════════════════════════════════════════════
+   Tab Refresher v2.3.0 — service worker
+   Desarrollado por: Hugo Perez-Vigo / hugopvigo
+   https://github.com/hugopvigo
+   ════════════════════════════════════════════════════════════════ */
+
 const TICK = 'refresh-tick';
 const alarmName = (tabId) => `reload-${tabId}`;
 
@@ -53,11 +59,23 @@ function ensureAlarm(configs, tabId) {
   }
 }
 
+/* ── Estadísticas de keep-alive ── */
+async function bumpStats() {
+  try {
+    const { stats } = await chrome.storage.local.get('stats');
+    const s = stats || { total: 0 };
+    s.total += 1;
+    await chrome.storage.local.set({ stats: s });
+  } catch (e) { /* las stats nunca deben romper el refresco */ }
+}
+
 /* ── Refresco de una pestaña ── */
 async function refreshTab(tabId) {
   const configs = await load();
   const c = configs[tabId];
   if (!c || !c.active) return;
+
+  if (await isPaused()) return;
 
   /* Smart Focus: si el usuario está EN esta pestaña, NO recargar.
      La alarma periódica volverá a disparar en un intervalo. */
@@ -77,6 +95,7 @@ async function refreshTab(tabId) {
   await persist(configs);
   try {
     await chrome.tabs.reload(tabId, { bypassCache: false });
+    await bumpStats();
     const t = await chrome.tabs.get(tabId).catch(() => null);
     if (t && t.discarded) {
       console.warn(`Tab Refresher: tab ${tabId} sigue descartada tras reload, forzando navegación`);
@@ -91,6 +110,7 @@ async function refreshTab(tabId) {
       delete configs[tabId];
       chrome.alarms.clear(alarmName(tabId));
       await persist(configs);
+      await clearTabBadge(tabId);
     }
     console.warn(`Tab Refresher: reload falló para tab ${tabId}`, e);
   }
@@ -133,11 +153,16 @@ async function refreshNow(tabId) {
     await chrome.tabs.reload(tabId, { bypassCache: false });
     c.lastRefresh = Date.now();
     await persist(configs);
+    await bumpStats();
   } catch (e) { /* noop */ }
   await updateBadge();
 }
 
-/* ── Badge: cuenta atrás hasta la recarga más próxima ── */
+/* ── Badge por-pestaña ──
+   El badge es global si no se pasa tabId: todas las pestañas mostrarían
+   el mismo countdown, lo que no tiene sentido con varias configuradas.
+   Correcto: badge solo en las pestañas con refresco activo (su propia
+   cuenta atrás), y global vacío para que el resto herede ''. */
 function fmtCountdown(secs) {
   if (secs <= 0) return '0:00';
   const m = Math.floor(secs / 60);
@@ -145,26 +170,46 @@ function fmtCountdown(secs) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+function badgeText(secs) {
+  if (secs < 60) return `${secs}s`;
+  if (secs < 600) return fmtCountdown(secs);
+  return `${Math.floor(secs / 60)}m`;
+}
+
+/* El estado per-tab del badge no muere solo al quitar la config: hay que
+   limpiarlo explícitamente o la pestaña se queda con un contador zombi. */
+async function clearTabBadge(tabId) {
+  try {
+    await chrome.action.setBadgeText({ tabId, text: '' });
+  } catch (e) { /* la pestaña pudo cerrarse */ }
+}
+
+async function isPaused() {
+  const { pausedUntil } = await chrome.storage.local.get('pausedUntil');
+  return Date.now() < (pausedUntil || 0);
+}
+
 async function updateBadge() {
   const configs = await load();
   const now = Date.now();
-  const next = Object.values(configs)
-    .filter(c => c.active && c.lastRefresh)
-    .map(c => c.lastRefresh + c.interval * 1000)
-    .reduce((a, b) => Math.min(a, b), Infinity);
-
-  if (!isFinite(next)) {
-    chrome.action.setBadgeText({ text: '' });
-    chrome.action.setBadgeBackgroundColor({ color: '#9aa0a6' });
-    return;
+  const paused = await isPaused();
+  for (const [idStr, c] of Object.entries(configs)) {
+    const tabId = parseInt(idStr);
+    try {
+      if (!paused && c.active && c.lastRefresh) {
+        const remaining = Math.max(0, Math.ceil((c.lastRefresh + c.interval * 1000 - now) / 1000));
+        await chrome.action.setBadgeText({ tabId, text: badgeText(remaining) });
+        await chrome.action.setBadgeBackgroundColor({ tabId, color: '#34a853' });
+      } else {
+        await chrome.action.setBadgeText({ tabId, text: '' });
+      }
+    } catch (e) { /* la pestaña pudo cerrarse entre medias */ }
   }
-  const remaining = Math.max(0, Math.ceil((next - now) / 1000));
-  let text;
-  if (remaining < 60) text = `${remaining}s`;
-  else if (remaining < 600) text = fmtCountdown(remaining);
-  else text = `${Math.floor(remaining / 60)}m`;
-  chrome.action.setBadgeText({ text });
-  chrome.action.setBadgeBackgroundColor({ color: '#1a73e8' });
+  /* Fallback global vacío: las pestañas sin config no muestran nada */
+  try {
+    await chrome.action.setBadgeText({ text: '' });
+    await chrome.action.setBadgeBackgroundColor({ color: '#9aa0a6' });
+  } catch (e) { /* noop */ }
 }
 
 /* ── Aplicar cambios desde el popup ── */
@@ -187,6 +232,7 @@ async function removeConfig(tabId) {
   chrome.alarms.clear(alarmName(tabId));
   await persist(configs);
   await setTabIcon(tabId, false);
+  await clearTabBadge(tabId);
   await setAutoDiscardable(tabId, true);
   await updateBadge();
 }
@@ -197,6 +243,7 @@ async function clearAll() {
   for (const id of Object.keys(configs)) {
     chrome.alarms.clear(alarmName(id));
     resets.push(setTabIcon(parseInt(id), false));
+    resets.push(clearTabBadge(parseInt(id)));
     if (configs[id].active) resets.push(setAutoDiscardable(parseInt(id), true));
   }
   await Promise.allSettled(resets);
@@ -288,8 +335,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       await removeConfig(msg.tabId);
       sendResponse({ ok: true });
     } else if (msg.action === 'get') {
-      const configs = await load();
-      sendResponse({ configs });
+      const [cfg, extra] = await Promise.all([
+        load(),
+        chrome.storage.local.get(['pausedUntil', 'stats']),
+      ]);
+      sendResponse({ configs: cfg, pausedUntil: extra.pausedUntil || 0, stats: extra.stats || { total: 0 } });
+    } else if (msg.action === 'set-pause') {
+      if (msg.until && msg.until > Date.now()) {
+        await chrome.storage.local.set({ pausedUntil: msg.until });
+      } else {
+        await chrome.storage.local.remove('pausedUntil');
+      }
+      await updateBadge();
+      sendResponse({ ok: true });
     } else if (msg.action === 'clear-all') {
       await clearAll();
       sendResponse({ ok: true });

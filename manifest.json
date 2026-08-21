@@ -1,8 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Tab Refresher",
-  "version": "2.2.0",
-  "description": "Refresca pestañas individualmente con intervalos por pestaña. Detección de foco, atajos y menú contextual.",
+  "version": "2.3.0",
+  "description": "Refresca pestañas individualmente con intervalos por pestaña. Detección de foco, atajos, menú contextual, pausa y estadísticas.",
+  "author": "Hugo Perez-Vigo / hugopvigo",
+  "homepage_url": "https://github.com/hugopvigo",
   "permissions": [
     "tabs",
     "storage",

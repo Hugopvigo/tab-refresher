@@ -2,6 +2,8 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <!-- Desarrollado por: Hugo Perez-Vigo / hugopvigo — https://github.com/hugopvigo -->
+  <meta name="author" content="Hugo Perez-Vigo (hugopvigo)">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -154,6 +156,13 @@
       letter-spacing: .5px; flex: 1;
     }
     .domain-count { font-size: 11px; color: #5f6368; background: #1a1c24; padding: 1px 7px; border-radius: 8px; }
+    .domain-pin {
+      font-size: 11px; cursor: pointer; flex-shrink: 0; line-height: 1;
+      opacity: .30; filter: grayscale(1); transition: opacity .15s, filter .15s;
+      user-select: none;
+    }
+    .domain-pin:hover { opacity: .75; }
+    .domain-pin.pinned { opacity: 1; filter: none; }
     .domain-items { overflow: hidden; }
     .domain-group.collapsed .domain-items { display: none; }
 
@@ -162,6 +171,9 @@
       display: flex; align-items: center; padding: 7px 18px 7px 36px; gap: 10px; border-top: 1px solid #12141a;
     }
     .tab-item:hover { background: #161820; }
+    /* Fila con refresco activo: borde verde + tinte (después del hover para ganar) */
+    .tab-item.active-row { background: rgba(52,168,83,.06); box-shadow: inset 2px 0 0 #34a853; }
+    .tab-item.active-row:hover { background: rgba(52,168,83,.11); }
     .tab-item .switch { width: 30px; height: 17px; }
     .tab-item .switch .slider::before { height: 13px; width: 13px; }
     .tab-item .switch input:checked + .slider::before { transform: translateX(13px); }
@@ -169,6 +181,27 @@
     .tab-info { overflow: hidden; flex: 1; min-width: 0; }
     .tab-title { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #e8eaed; }
     .tab-item .select { font-size: 11px; padding: 3px 4px; }
+
+    /* ── Hero: pausa global ── */
+    .hero-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .pause-select {
+      background: #1a1c24; border: 1px solid #2a2d37; color: #9aa0a6;
+      font-size: 11px; border-radius: 6px; padding: 3px 4px; outline: none; cursor: pointer;
+    }
+    .pause-select:hover { border-color: #fbbc04; color: #e8eaed; }
+    .resume-btn {
+      background: #fbbc0422; border: 1px solid #fbbc04; color: #fbbc04;
+      font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 8px; cursor: pointer;
+      transition: background .15s; white-space: nowrap;
+    }
+    .resume-btn:hover { background: #fbbc0433; }
+    .hidden { display: none !important; }
+
+    /* ── Footer de estadísticas ── */
+    .footer-stats {
+      padding: 7px 18px; border-top: 1px solid #1e2028; background: #0d0f14;
+      font-size: 11px; color: #5f6368; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
 
     /* ── Empty ── */
     .empty { text-align: center; padding: 24px 18px; color: #5f6368; font-size: 13px; }
@@ -186,6 +219,15 @@
   <div class="hero">
     <div class="hero-dot" id="heroDot"></div>
     <span class="hero-text" id="heroText">Inactivo</span>
+    <div class="hero-actions">
+      <select class="pause-select" id="pauseSel" title="Pausar todos los refrescos temporalmente">
+        <option value="" disabled selected>⏸ Pausar</option>
+        <option value="30">30 min</option>
+        <option value="60">1 h</option>
+        <option value="120">2 h</option>
+      </select>
+      <button class="resume-btn hidden" id="btnResume" title="Reanudar los refrescos"></button>
+    </div>
   </div>
 
   <div class="current-section" id="currentSection"></div>
@@ -196,6 +238,8 @@
   </div>
 
   <div class="tabs-section" id="tabsList"></div>
+
+  <div class="footer-stats" id="statsLine"></div>
 
   <script src="popup.js"></script>
 </body>
