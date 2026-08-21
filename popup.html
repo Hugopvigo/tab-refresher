@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      width: 400px;
+      max-height: 560px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f1117;
+      color: #e8eaed;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    .header {
+      padding: 16px 18px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #1e2028;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header img { width: 22px; height: 22px; }
+    .header h1 { font-size: 15px; font-weight: 600; letter-spacing: .3px; }
+    .header .clear-btn {
+      background: none; border: 1px solid #2a2d37; color: #9aa0a6;
+      font-size: 12px; padding: 4px 10px; border-radius: 8px; cursor: pointer;
+      transition: all .15s;
+    }
+    .header .clear-btn:hover { border-color: #ea4335; color: #ea4335; }
+    .header .clear-btn.armed { border-color: #ea4335; color: #ea4335; background: #ea433522; }
+
+    /* ── Hero status ── */
+    .hero {
+      padding: 10px 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #13151c;
+      border-bottom: 1px solid #1e2028;
+    }
+    .hero-dot { width: 10px; height: 10px; border-radius: 50%; background: #5f6368; flex-shrink: 0; }
+    .hero-dot.on { background: #34a853; box-shadow: 0 0 8px #34a853aa; }
+    .hero-text { font-size: 13px; color: #9aa0a6; flex: 1; }
+    .hero-text.on { color: #e8eaed; }
+
+    /* ── Current tab ── */
+    .current-section { padding: 12px 18px; border-bottom: 1px solid #1e2028; background: #12151e; }
+    .current-label {
+      font-size: 11px; font-weight: 600; color: #1a73e8; text-transform: uppercase;
+      letter-spacing: .5px; margin-bottom: 8px;
+    }
+    .current-tab {
+      display: flex; align-items: center; gap: 10px;
+      background: #1a1c24; border: 1px solid #2a2d37; border-radius: 10px; padding: 10px 12px;
+    }
+    .current-tab.active-tab { border-color: #34a853; }
+    .current-tab img { width: 18px; height: 18px; flex-shrink: 0; border-radius: 3px; }
+    .current-info { overflow: hidden; flex: 1; min-width: 0; }
+    .current-title {
+      font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .current-url { font-size: 11px; color: #5f6368; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .current-fresh {
+      display: inline-flex; align-items: center; gap: 4px; margin-top: 3px;
+      font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 6px;
+    }
+    .fresh-0 { background: #34a85322; color: #34a853; }
+    .fresh-1 { background: #fbbc0422; color: #fbbc04; }
+    .fresh-2 { background: #ea433522; color: #ea4335; }
+
+    .current-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+    /* Switch */
+    .switch { position: relative; width: 34px; height: 19px; flex-shrink: 0; cursor: pointer; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; inset: 0; background: #2a2d37; border-radius: 19px; transition: background .2s;
+    }
+    .slider::before {
+      content: ''; position: absolute; height: 15px; width: 15px; left: 2px; top: 2px;
+      background: #9aa0a6; border-radius: 50%; transition: transform .2s, background .2s;
+    }
+    .switch input:checked + .slider { background: #1a73e8; }
+    .switch input:checked + .slider::before { transform: translateX(15px); background: #fff; }
+
+    .select {
+      background: #1a1c24; border: 1px solid #2a2d37; color: #9aa0a6;
+      font-size: 12px; border-radius: 6px; padding: 5px 6px; outline: none; cursor: pointer;
+    }
+    .select:hover { border-color: #1a73e8; color: #e8eaed; }
+    .select.refreshing { border-color: #34a853; color: #34a853; }
+    .refresh-now {
+      background: none; border: 1px solid #2a2d37; color: #9aa0a6; font-size: 14px;
+      width: 28px; height: 28px; border-radius: 6px; cursor: pointer; transition: all .15s; line-height: 1;
+    }
+    .refresh-now:hover { color: #e8eaed; border-color: #1a73e8; }
+
+    /* ── List ── */
+    .list-label {
+      padding: 10px 18px 6px; font-size: 11px; font-weight: 600; color: #5f6368;
+      text-transform: uppercase; letter-spacing: .5px; display: flex; align-items: center; gap: 6px;
+    }
+    .list-label .count { background: #1a1c24; padding: 1px 7px; border-radius: 8px; }
+
+    .search-row { padding: 4px 18px 10px; }
+    .search-row input {
+      width: 100%;
+      background: #1a1c24;
+      border: 1px solid #2a2d37;
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 13px;
+      color: #e8eaed;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .search-row input::placeholder { color: #5f6368; }
+    .search-row input:focus { border-color: #1a73e8; }
+
+    .tabs-section {
+      max-height: 200px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #2a2d37 transparent;
+    }
+    .tabs-section::-webkit-scrollbar { width: 5px; }
+    .tabs-section::-webkit-scrollbar-track { background: transparent; }
+    .tabs-section::-webkit-scrollbar-thumb { background: #2a2d37; border-radius: 4px; }
+
+    /* ── Domain group ── */
+    .domain-group { border-bottom: 1px solid #1a1c24; }
+    .domain-header {
+      display: flex; align-items: center; gap: 8px; padding: 7px 18px;
+      cursor: pointer; user-select: none; transition: background .15s;
+    }
+    .domain-header:hover { background: #1a1c24; }
+    .domain-chevron { font-size: 10px; color: #5f6368; transition: transform .2s; width: 14px; text-align: center; }
+    .domain-group.collapsed .domain-chevron { transform: rotate(-90deg); }
+    .domain-name {
+      font-size: 12px; font-weight: 600; color: #9aa0a6; text-transform: uppercase;
+      letter-spacing: .5px; flex: 1;
+    }
+    .domain-count { font-size: 11px; color: #5f6368; background: #1a1c24; padding: 1px 7px; border-radius: 8px; }
+    .domain-items { overflow: hidden; }
+    .domain-group.collapsed .domain-items { display: none; }
+
+    /* ── Tab item (list) ── */
+    .tab-item {
+      display: flex; align-items: center; padding: 7px 18px 7px 36px; gap: 10px; border-top: 1px solid #12141a;
+    }
+    .tab-item:hover { background: #161820; }
+    .tab-item .switch { width: 30px; height: 17px; }
+    .tab-item .switch .slider::before { height: 13px; width: 13px; }
+    .tab-item .switch input:checked + .slider::before { transform: translateX(13px); }
+    .tab-item img { width: 14px; height: 14px; flex-shrink: 0; border-radius: 2px; }
+    .tab-info { overflow: hidden; flex: 1; min-width: 0; }
+    .tab-title { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #e8eaed; }
+    .tab-item .select { font-size: 11px; padding: 3px 4px; }
+
+    /* ── Empty ── */
+    .empty { text-align: center; padding: 24px 18px; color: #5f6368; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <img src="icon.png" alt="">
+      <h1>Tab Refresher</h1>
+    </div>
+    <button class="clear-btn" id="btnClear">Limpiar todo</button>
+  </div>
+
+  <div class="hero">
+    <div class="hero-dot" id="heroDot"></div>
+    <span class="hero-text" id="heroText">Inactivo</span>
+  </div>
+
+  <div class="current-section" id="currentSection"></div>
+
+  <div class="list-label">Otras pestañas <span class="count" id="otherCount"></span></div>
+  <div class="search-row">
+    <input type="text" id="search" placeholder="Buscar pestaña...">
+  </div>
+
+  <div class="tabs-section" id="tabsList"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
