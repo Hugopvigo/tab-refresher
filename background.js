@@ -58,6 +58,21 @@ async function refreshTab(tabId) {
   const configs = await load();
   const c = configs[tabId];
   if (!c || !c.active) return;
+
+  /* Smart Focus: si el usuario está EN esta pestaña, NO recargar.
+     La alarma periódica volverá a disparar en un intervalo. */
+  try {
+    const win = await chrome.windows.getLastFocused();
+    if (win?.focused) {
+      const [activeTab] = await chrome.tabs.query({ active: true, windowId: win.id });
+      if (activeTab?.id === tabId) {
+        return;
+      }
+    }
+  } catch (e) {
+    console.warn('Tab Refresher: focus check falló', e);
+  }
+
   c.lastRefresh = Date.now();
   await persist(configs);
   try {
@@ -80,6 +95,33 @@ async function refreshTab(tabId) {
     console.warn(`Tab Refresher: reload falló para tab ${tabId}`, e);
   }
   await updateBadge();
+}
+
+/* ── Helpers para atajos y menú contextual ──
+   Mismo criterio que el popup (isUsable): no crear configs sobre páginas
+   internas, quedarían como alarmas zombi que fallan en silencio. */
+function isUsableUrl(url) {
+  return !!url && !url.startsWith('chrome://') && !url.startsWith('chrome-extension://');
+}
+
+async function toggleTabRefresh(tabId) {
+  const configs = await load();
+  const prev = configs[tabId];
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  if (!tab || !isUsableUrl(tab.url)) return;
+  const active = !(prev?.active);
+  const interval = prev?.interval || 90;
+  await upsert(tabId, { url: tab.url, title: tab.title, interval, active });
+}
+
+/* Apagar sin machacar el intervalo configurado: se conserva para cuando
+   se reactive por Alt+R o desde el popup. */
+async function pauseTabRefresh(tabId) {
+  const configs = await load();
+  const prev = configs[tabId];
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  if (!tab || !prev) return;
+  await upsert(tabId, { url: tab.url, title: tab.title, interval: prev.interval || 90, active: false });
 }
 
 /* ── Refresco manual ── */
@@ -185,6 +227,55 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
   if (!c) return;
   c.url = changeInfo.url;
   await persist(configs);
+});
+
+/* ── Atajo Alt+R: alterna refresco de la pestaña actual ── */
+chrome.commands.onCommand.addListener((command) => {
+  if (command === 'toggle-refresh') {
+    chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+      if (tab?.id) toggleTabRefresh(tab.id);
+    });
+  }
+});
+
+/* ── Menú contextual: Auto-refrescar ▸ 30s · 1m · 5m · 10m · Apagar ── */
+function createContextMenu() {
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: 'autorefresh-parent',
+      title: 'Auto-refrescar',
+      contexts: ['page', 'tab'],
+    });
+    [30, 60, 300, 600].forEach((sec) => {
+      chrome.contextMenus.create({
+        id: `autorefresh-${sec}`,
+        parentId: 'autorefresh-parent',
+        title: sec < 60 ? `${sec}s` : `${sec / 60}m`,
+        contexts: ['page', 'tab'],
+      });
+    });
+    chrome.contextMenus.create({
+      id: 'autorefresh-off',
+      parentId: 'autorefresh-parent',
+      title: 'Apagar',
+      contexts: ['page', 'tab'],
+    });
+  });
+}
+
+chrome.runtime.onInstalled.addListener(createContextMenu);
+chrome.runtime.onStartup.addListener(createContextMenu);
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (!tab?.id || !isUsableUrl(tab.url)) return;
+  if (info.menuItemId === 'autorefresh-off') {
+    pauseTabRefresh(tab.id);
+  } else if (String(info.menuItemId).startsWith('autorefresh-')) {
+    const sec = parseInt(String(info.menuItemId).split('-')[1], 10);
+    if (!Number.isNaN(sec)) {
+      upsert(tab.id, { url: tab.url, title: tab.title, interval: sec, active: true });
+    }
+  }
 });
 
 /* ── Mensajes del popup ── */

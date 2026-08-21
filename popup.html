@@ -71,8 +71,17 @@
     .fresh-0 { background: #34a85322; color: #34a853; }
     .fresh-1 { background: #fbbc0422; color: #fbbc04; }
     .fresh-2 { background: #ea433522; color: #ea4335; }
+    .fresh-paused { background: #5f636822; color: #9aa0a6; }
 
     .current-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+    /* ── Domain switch (header) ── */
+    .domain-switch { flex-shrink: 0; margin-left: auto; }
+    .domain-switch .switch { width: 30px; height: 17px; }
+    .domain-switch .switch .slider::before { height: 13px; width: 13px; }
+    .domain-switch .switch input:checked + .slider::before { transform: translateX(13px); }
+    .domain-switch.mixed .slider { background: #fbbc04; }
+    .domain-switch.mixed .slider::before { background: #fff; transform: translateX(13px); }
 
     /* Switch */
     .switch { position: relative; width: 34px; height: 19px; flex-shrink: 0; cursor: pointer; }

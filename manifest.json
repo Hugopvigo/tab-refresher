@@ -1,13 +1,22 @@
 {
   "manifest_version": 3,
   "name": "Tab Refresher",
-  "version": "2.1.0",
-  "description": "Refresca pestañas individualmente con intervalos por pestaña.",
+  "version": "2.2.0",
+  "description": "Refresca pestañas individualmente con intervalos por pestaña. Detección de foco, atajos y menú contextual.",
   "permissions": [
     "tabs",
     "storage",
-    "alarms"
+    "alarms",
+    "contextMenus"
   ],
+  "commands": {
+    "toggle-refresh": {
+      "suggested_key": {
+        "default": "Alt+R"
+      },
+      "description": "Alternar auto-refresco de la pestaña actual"
+    }
+  },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

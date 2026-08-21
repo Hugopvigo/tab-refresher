@@ -10,6 +10,7 @@ let allTabs = [];
 let currentTab = null;
 let filterText = '';
 let configs = {}; // tabId -> {url,title,interval,active,lastRefresh}
+let focusedTabId = null; // tabId de la pestaña con foco en la ventana activa
 
 const PRESETS = [
   { val: 30,  label: '30s' },
@@ -76,7 +77,7 @@ function renderCurrent() {
   const active = !!(c && c.active);
   const interval = (c && c.interval) || 90;
   const fav = currentTab.favIconUrl || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="%23555"/></svg>';
-  const fresh = active ? freshnessTag(c.lastRefresh) : null;
+  const fresh = active ? freshnessTag(c.lastRefresh, currentTab.id) : null;
 
   currentSection.innerHTML = `
     <div class="current-label">Pestaña actual</div>
@@ -109,16 +110,26 @@ function renderCurrent() {
   });
 }
 
-/* ── Frescura de la pestaña actual ── */
-function freshnessTag(lastRefresh) {
+/* ── Frescura de la pestaña actual ──
+   El popup siempre se abre sobre la pestaña enfocada, así que el estado
+   "en pausa" es lo normal aquí: se muestra junto al tiempo real, nunca
+   en sustitución (si no, el contador sería invisible siempre). */
+function fmtAgo(sec) {
+  if (sec < 60) return `${sec}s`;
+  if (sec < 3600) return `${Math.floor(sec / 60)}m`;
+  return `${Math.floor(sec / 3600)}h`;
+}
+
+function freshnessTag(lastRefresh, tabId) {
   if (!lastRefresh) return null;
   const sec = Math.floor((Date.now() - lastRefresh) / 1000);
-  let label;
-  if (sec < 60) label = `Recargada hace ${sec}s`;
-  else if (sec < 3600) label = `Recargada hace ${Math.floor(sec / 60)}m`;
-  else label = `Recargada hace ${Math.floor(sec / 3600)}h`;
-  const cls = sec < 60 ? 'fresh-0' : (sec < 300 ? 'fresh-1' : 'fresh-2');
-  return { label, cls };
+  if (tabId === focusedTabId) {
+    return { label: `En pausa · recargada hace ${fmtAgo(sec)}`, cls: 'fresh-paused' };
+  }
+  return {
+    label: `Recargada hace ${fmtAgo(sec)}`,
+    cls: sec < 60 ? 'fresh-0' : (sec < 300 ? 'fresh-1' : 'fresh-2'),
+  };
 }
 
 function updateCurrentFreshness() {
@@ -131,11 +142,38 @@ function updateCurrentFreshness() {
     card.classList.remove('active-tab');
     return;
   }
-  const fresh = freshnessTag(c.lastRefresh);
+  const fresh = freshnessTag(c.lastRefresh, currentTab.id);
   if (fresh) {
     el.textContent = fresh.label;
     el.className = `current-fresh ${fresh.cls}`;
   }
+}
+
+/* ── Estado del switch de dominio ──
+   Las pestañas sin config cuentan como apagadas: si no, un grupo con una
+   sola pestaña activa mostraría el switch encendido y el clic apagaría
+   todo el grupo (comportamiento sorpresa). */
+function getDomainSwitchState(domainTabs) {
+  const states = domainTabs.map(t => !!(configs[t.id] && configs[t.id].active));
+  const allOn = states.every(Boolean);
+  const allOff = states.every(v => !v);
+  return allOn ? 'allOn' : (allOff ? 'allOff' : 'mixed');
+}
+
+/* ── Handler switch de dominio ── */
+async function onDomainSwitchClick(domain, domainTabs) {
+  const state = getDomainSwitchState(domainTabs);
+  const turnOn = state !== 'allOn';
+  for (const tab of domainTabs) {
+    const prev = configs[tab.id] || {};
+    const interval = prev.interval || 90;
+    await chrome.runtime.sendMessage({
+      action: 'upsert',
+      tabId: tab.id,
+      config: { url: tab.url, title: tab.title, interval, active: turnOn }
+    });
+  }
+  await reloadState();
 }
 
 /* ── Lista del resto de pestañas ── */
@@ -162,14 +200,25 @@ function renderTabs() {
     const group = document.createElement('div');
     group.className = 'domain-group';
 
+    const state = getDomainSwitchState(domainTabs);
     const header = document.createElement('div');
     header.className = 'domain-header';
     header.innerHTML = `
       <span class="domain-chevron">▼</span>
       <span class="domain-name">${escapeHtml(domain)}</span>
       <span class="domain-count">${domainTabs.length}</span>
+      <label class="switch domain-switch ${state === 'mixed' ? 'mixed' : ''}" title="Activar/desactivar todo el grupo">
+        <input type="checkbox" ${state === 'allOn' ? 'checked' : ''}>
+        <span class="slider"></span>
+      </label>
     `;
-    header.addEventListener('click', () => group.classList.toggle('collapsed'));
+    header.addEventListener('click', (e) => {
+      if (e.target.closest('.domain-switch')) return;
+      group.classList.toggle('collapsed');
+    });
+
+    const switchEl = header.querySelector('.domain-switch input');
+    switchEl.addEventListener('change', () => onDomainSwitchClick(domain, domainTabs));
 
     const items = document.createElement('div');
     items.className = 'domain-items';
@@ -259,6 +308,7 @@ async function loadTabs() {
   const tabs = await chrome.tabs.query({ currentWindow: true });
   const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
   currentTab = isUsable(active) ? active : null;
+  focusedTabId = currentTab?.id || null;
   allTabs = tabs.filter(isUsable);
   await reloadState();
 }
