@@ -31,9 +31,7 @@ navegador, sino las que tú elijas, y solo mientras no las estés mirando.
 | | |
 |---|---|
 | ![popup de Tab Refresher](docs/capturas/01-popup.png) | |
-| El popup: la pestaña actual arriba, el resto agrupadas por dominio. | |
-
-*El popup de la extensión, renderizado con datos de ejemplo.*
+| El popup con datos de ejemplo: la pestaña actual arriba, el resto agrupadas por dominio. | |
 
 Encima, la **pestaña actual**: su interruptor, su intervalo y un botón para
 recargarla en el instante. Debajo, las demás **agrupadas por dominio**, con
