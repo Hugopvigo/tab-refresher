@@ -11,7 +11,7 @@
   <img alt="versión" src="https://img.shields.io/badge/versi%C3%B3n-2.3.0-8E8E93?style=flat-square&labelColor=1a1a1e">
   <img alt="manifest" src="https://img.shields.io/badge/Chrome-Manifest%20V3-3DDC84?style=flat-square&labelColor=1a1a1e">
   <img alt="javascript" src="https://img.shields.io/badge/JavaScript-sin%20dependencias-8E8E93?style=flat-square&labelColor=1a1a1e">
-  <img alt="licencia" src="https://img.shields.io/badge/licencia-sin%20licencia%20expl%C3%ADcita-5F6368?style=flat-square&labelColor=1a1a1e">
+  <img alt="licencia" src="https://img.shields.io/badge/licencia-CC%20BY--NC--SA%204.0-5F6368?style=flat-square&labelColor=1a1a1e">
 </p>
 
 ---
@@ -118,8 +118,9 @@ menudo, `storage` es la fuente de verdad y el popup se sincroniza con
 
 ## Licencia
 
-**Sin licencia explícita.** El repositorio no incluye un fichero `LICENSE`;
-si quieres reutilizarlo, primero convénete con el autor.
+El código de este repositorio está bajo **CC BY-NC-SA 4.0**: se puede compartir
+y adaptar con fines no comerciales, citando al autor y manteniendo la misma
+licencia. Texto completo en [`LICENSE`](LICENSE).
 
 ---
 
