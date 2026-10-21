@@ -46,6 +46,12 @@ navegador, sino las que tú elijas, y solo mientras no las estés mirando.
 | ![popup de Tab Refresher](docs/capturas/01-popup.png) | |
 | El popup con datos de ejemplo: la pestaña actual arriba, el resto agrupadas por dominio. | |
 
+<p align="center">
+  <img src="docs/capturas/02-demo.gif" alt="El interruptor de la pestaña actual encendiéndose" width="420">
+</p>
+
+<p align="center"><sub>El interruptor de la pestaña actual, encendiéndose. El popup y su código son los de verdad; los datos son de ejemplo.</sub></p>
+
 Encima, la **pestaña actual**: su interruptor, su intervalo y un botón para
 recargarla en el instante. Debajo, las demás **agrupadas por dominio**, con
 un interruptor por grupo, un 📌 para fijar un dominio arriba y un buscador que
