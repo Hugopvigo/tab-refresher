@@ -1,5 +1,18 @@
+<meta property="og:title" content="TAB REFRESHER">
+<meta property="og:description" content="Recarga cada pestaña por su cuenta, con su propio intervalo. Y se calla cuando la estás mirando">
+<meta property="og:image" content="https://raw.githubusercontent.com/Hugopvigo/tab-refresher/main/docs/capturas/og.png">
+
 <p align="center">
   <img src="docs/capturas/00-cabecera.png" alt="Tab Refresher — extensión de Chrome que recarga las pestañas automáticamente" width="100%">
+</p>
+
+<p align="center">
+  <a href="https://github.com/Hugopvigo/tab-refresher/blob/main/docs/capturas/02-demo.gif"><img alt="demo" src="https://img.shields.io/badge/demo-en%20vivo-ff5a3c?style=flat-square&labelColor=1a1a1e"></a>
+  <img alt="Chrome" src="https://img.shields.io/badge/Chrome-Manifest%20V3-3DDC84?style=flat-square&labelColor=1a1a1e">
+  <img alt="JavaScript" src="https://img.shields.io/badge/JavaScript-sin%20dependencias-8E8E93?style=flat-square&labelColor=1a1a1e">
+  <a href="https://github.com/Hugopvigo/tab-refresher/releases"><img alt="versión" src="https://img.shields.io/badge/versión-2.3.0-8E8E93?style=flat-square&labelColor=1a1a1e"></a>
+  <img alt="licencia" src="https://img.shields.io/badge/licencia-CC%20BY--NC--SA%204.0-8E8E93?style=flat-square&labelColor=1a1a1e">
+  <img alt="idioma" src="https://img.shields.io/badge/idioma-Español-8E8E93?style=flat-square&labelColor=1a1a1e">
 </p>
 
 <p align="center">
